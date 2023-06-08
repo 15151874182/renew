@@ -12,7 +12,9 @@ import warnings
 warnings.filterwarnings('ignore') 
 
 from datetime import date, timedelta
+from renew_center.tools.plot_view import plot_peroid
 from renew_center.tools.logger import setup_logger
+from renew_center.tools.fix_date import fix_date
 logger=setup_logger('logger')
 
 class Clean():
@@ -25,7 +27,9 @@ class Clean():
               capacity,
               online,   ##None for wind clean
               Longitude, ##None for wind clean
-              Latitude): ##None for wind clean
+              Latitude, ##None for wind clean
+              trend,   ##['fea1','fea2'], None if unwanted
+              plot=False): ##['fea1','fea2'..], False if unwanted
 
 #preparing ====================================================================        
         day_point=96  ##15min time freq everyday
@@ -84,8 +88,22 @@ class Clean():
 #handle_constant================================================================        
         ##constant=0 or capacity will be ignored,constant=0 problem will be put into similarity detect part             
             df=self.handle_constant(df,col,capacity,threshold=day_point//6) 
-            xx=1
-        
+
+
+
+#handle_trend if want==============================================================
+        if trend:
+            df=self. handle_trend(df, trend, day_point)
+#fix_date==================================================================     
+        df=fix_date(df,data,freq='15T')
+#if plot cleaned result========================================================================        
+        if plot:
+            feas,start_day,days=plot[0],plot[1],plot[2]
+            plot_peroid(data,'before',time_col = "date",cols = feas,start_day = start_day,end_day=None,days = days)
+            plot_peroid(df,'after',time_col = "date",cols = feas,start_day = start_day,end_day=None,days = days)   
+        return df   ##after clean process, this return df has NaN which must drop or interpolate according to train or predict model
+            
+            
     def clean_area(self,config,selected_feas):
         return self.clean(data=config.data,
                           selected_feas=selected_feas,
@@ -129,6 +147,26 @@ class Clean():
         df['index']=df['index'].apply(lambda x: False if x in constant_index else True)
         df=df[df['index']==True] ##remain index wanted
         del df['index'],df['constant_std'],df['constant_mu'] ##delete auxiliary varible
+        return df
+
+    def handle_trend(self, data, trend, freq=96):
+        '''
+        quantile=0.8 means remain top 80% data
+        '''
+        df=deepcopy(data)
+        col1,col2,quantile=trend[0],trend[1],trend[2]
+        # use MAE method to delete 2 feas with different trend
+        df['col1'] = (df[col1] - df[col1].min()) / \
+            (df[col1].max() - df[col1].min())  # max-min-normlize
+        df['col2'] = (df[col2] - df[col2].min()) / \
+            (df[col2].max() - df[col2].min())
+        df_list = [(df.iloc[i * freq:(i + 1) * freq]['col1'], df.iloc[i *
+                    freq:(i + 1) * freq]['col2']) for i in range(int(len(df) / freq))]
+        res = pd.Series(map(lambda x: np.mean(abs(x[0] - x[1])) * 1000, df_list))
+        filted_res = res[res <= np.quantile(res, quantile)].index.tolist() 
+        df_list = [df.iloc[i * freq:(i + 1) * freq] for i in filted_res]
+        df = pd.concat(df_list, axis=0)
+        del df['col1'], df['col2']
         return df
 
     def download_suntime(self,area,belong,Longitude,Latitude,begin,end):
@@ -214,3 +252,4 @@ class Clean():
         df[col][df['sunset_flag']==True]=0 ##sunset points set to zero
         del df['sunset_flag'],df['date'],df['sunset_point']
         return df
+
