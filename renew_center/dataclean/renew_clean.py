@@ -20,10 +20,9 @@ logger=setup_logger('logger')
 class Clean():
     def __init__(self):
         pass
-    def clean(self,data,selected_feas,
+    def clean(self,data,feas_used,
               area,
               area_type,
-              use_type,  ##'train'(may delete bad feas)/'predcit'(fix data only)
               capacity,
               online,   ##None for wind clean
               Longitude, ##None for wind clean
@@ -34,7 +33,7 @@ class Clean():
 #preparing ====================================================================        
         day_point=96  ##15min time freq everyday
         df=deepcopy(data)
-        df=df[selected_feas]
+        df=df[feas_used]
         if area_type=='pv' and online==True:
             from astral.sun import sun
             from astral import LocationInfo     
@@ -55,8 +54,9 @@ class Clean():
             self.suntime = pd.read_csv('data/suntime.csv')
             
 # =============================================================================             
-        for col in selected_feas: ##every feas should handle_NAN,handle_limit,handle_constant
-            #### fea name should follow rules as below
+        for col in tqdm(feas_used): ##every feas should handle_NAN,handle_limit,handle_constant
+            
+        #### fea name should follow rules as below
             if "speed" in col:    ##wind speed
                 upper,lower = 35,0  
             elif "dir" in col:    ##wind direction
@@ -91,6 +91,7 @@ class Clean():
 
 
 
+
 #handle_trend if want==============================================================
         if trend:
             df=self. handle_trend(df, trend, day_point)
@@ -104,13 +105,17 @@ class Clean():
         return df   ##after clean process, this return df has NaN which must drop or interpolate according to train or predict model
             
             
-    def clean_area(self,config,selected_feas):
+    def clean_area(self,config,online=True,plot=True):
         return self.clean(data=config.data,
-                          selected_feas=selected_feas,
-                          use_type=config.use_type,  ##'train'/'predcit'
+                          feas_used=config.feas_used,
+                          area=config.area,
+                          area_type=config.area_type,
                           capacity=config.capacity,
-                          Longitude=config.Longitude,
-                          Latitude=config.Latitude)
+                          online=online,   ##None for wind clean
+                          Longitude=config.Longitude, ##None for wind clean
+                          Latitude=config.Latitude, ##None for wind clean
+                          trend=config.trend,   ##['fea1','fea2'], None if unwanted
+                          plot=plot) ##['fea1','fea2'..], False if unwanted
     
     def check_length(self,data,day_point,threshold):
         days=len(data)//day_point
@@ -139,7 +144,7 @@ class Clean():
         df['constant_std'] = df[col].rolling(window=threshold).std()
         df['constant_mu'] = df[col].rolling(window=threshold).mean()
         df['index']=range(len(df)) ##data's index are date so....
-        condition=(df['constant_std']==0) & ((df['constant_mu']!=0) | (df['constant_mu']!=capacity))
+        condition=(df['constant_std']==0) & ((df['constant_mu']!=0) & (df['constant_mu']!=capacity))
         constant_end_index=df[condition]['index'] ##find end index
         constant_index=[] ##find all index not wanted
         for i in constant_end_index:
@@ -163,7 +168,7 @@ class Clean():
         df_list = [(df.iloc[i * freq:(i + 1) * freq]['col1'], df.iloc[i *
                     freq:(i + 1) * freq]['col2']) for i in range(int(len(df) / freq))]
         res = pd.Series(map(lambda x: np.mean(abs(x[0] - x[1])) * 1000, df_list))
-        filted_res = res[res <= np.quantile(res, quantile)].index.tolist() 
+        filted_res = res[res <= np.quantile(res, float(quantile))].index.tolist() 
         df_list = [df.iloc[i * freq:(i + 1) * freq] for i in filted_res]
         df = pd.concat(df_list, axis=0)
         del df['col1'], df['col2']

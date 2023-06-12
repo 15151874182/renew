@@ -121,26 +121,28 @@ class EnvConfig:
         self.database_ip = '153.3.1.201'
 
 class AreaConfig:
-    def __init__(self, area_name):
-        self.area_name = area_name
+    def __init__(self, area):
+        self.area = area
         self.project_path = os.path.dirname(os.path.abspath(__file__))
-        self.area_path = os.path.join(self.project_path, "data","area", area_name)
+        self.area_path = os.path.join(self.project_path, "data","area", area)
         self.area_info = pd.read_csv(os.path.join(self.project_path, 'data','area_info.csv'))
         
-        self.capacity = self.area_info[self.area_info["FarmCode"] == area_name]['capacity'].iloc[0]
-        self.Longitude = self.area_info[self.area_info["FarmCode"] == area_name]['Longitude'].iloc[0]
-        self.Latitude = self.area_info[self.area_info["FarmCode"] == area_name]['Latitude'].iloc[0]
-        self.area_type = self.area_info[self.area_info["FarmCode"] == area_name]['area_type'].iloc[0]
+        self.capacity = self.area_info[self.area_info["FarmCode"] == area]['capacity'].iloc[0]
+        self.Longitude = self.area_info[self.area_info["FarmCode"] == area]['Longitude'].iloc[0]
+        self.Latitude = self.area_info[self.area_info["FarmCode"] == area]['Latitude'].iloc[0]
+        self.area_type = self.area_info[self.area_info["FarmCode"] == area]['area_type'].iloc[0]
 
-        self.models_used = self.area_info[self.area_info["FarmCode"] == area_name]['models_used'].iloc[0]
-        self.feas_used = self.area_info[self.area_info["FarmCode"] == area_name]['feas_used'].iloc[0]
+        self.models_used = self.area_info[self.area_info["FarmCode"] == area]['models_used'].iloc[0]
+        self.feas_used = self.area_info[self.area_info["FarmCode"] == area]['feas_used'].iloc[0].split('+')
         
         #In json.loads(dict), '' for key and value must be replaced by "" in dict, use true not True 
-        self.xgb_config = json.loads(self.area_info[self.area_info["FarmCode"] == area_name]['xgb_config'].iloc[0])
-        self.lgb_config = json.loads(self.area_info[self.area_info["FarmCode"] == area_name]['lgb_config'].iloc[0])
-        self.lr_config = json.loads(self.area_info[self.area_info["FarmCode"] == area_name]['lr_config'].iloc[0])
+        self.xgb_config = json.loads(self.area_info[self.area_info["FarmCode"] == area]['xgb_config'].iloc[0])
+        self.lgb_config = json.loads(self.area_info[self.area_info["FarmCode"] == area]['lgb_config'].iloc[0])
+        self.lr_config = json.loads(self.area_info[self.area_info["FarmCode"] == area]['lr_config'].iloc[0])
         
-        self.day_point = self.area_info[self.area_info["FarmCode"] == area_name]['day_point'].iloc[0]        
+        self.day_point = self.area_info[self.area_info["FarmCode"] == area]['day_point'].iloc[0]   
+        self.trend = self.area_info[self.area_info["FarmCode"] == area]['trend'].iloc[0].split('+')
+        
 
 if __name__ == '__main__':
     config=AreaConfig('NARI-19012-Xibei-gbdyfd')
